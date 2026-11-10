@@ -1,0 +1,5 @@
+{
+  "livePreview.openPreviewTarget": "Embedded Preview",
+  "livePreview.hostIP": "0.0.0.0",
+  "livePreview.portNumber": 3000
+}

@@ -1,0 +1,24 @@
+{
+  "name": "Vanilla JavaScript Game",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "remoteUser": "vscode",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.live-preview"
+      ],
+      "settings": {
+        "livePreview.openPreviewTarget": "Embedded Preview",
+        "livePreview.hostIP": "0.0.0.0",
+        "livePreview.portNumber": 3000
+      }
+    }
+  },
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Live Preview",
+      "onAutoForward": "silent"
+    }
+  }
+}
