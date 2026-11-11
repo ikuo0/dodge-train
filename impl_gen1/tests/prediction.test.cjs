@@ -95,11 +95,12 @@ test('new outcome vocabulary trains with finite weights after ring buffer wrap',
   `, context), true);
 });
 
-test('bullet density reduces firing at four levels and persists through reset', () => {
+test('bullet density defaults to the quarter-rate baseline and offers half/double', () => {
   const {context, elements} = game();
   vm.runInContext('Math.random = () => 0.5', context);
+  assert.equal(vm.runInContext('shotIntervalScale', context), 4);
   const counts = [];
-  for (const scale of [1, 2, 4, 8]) {
+  for (const scale of [2, 4, 8]) {
     elements.get('bullet-density').value = String(scale);
     elements.get('bullet-density').onchange();
     const result = JSON.parse(vm.runInContext(`
@@ -114,10 +115,10 @@ test('bullet density reduces firing at four levels and persists through reset', 
     assert.ok(Math.abs(result.rightDelay - 0.3 * scale) < 1e-9);
     counts.push(result.fired);
   }
-  for (let i=1; i<counts.length; i++) {
-    assert.ok(counts[i] < counts[i-1]);
-    assert.ok(Math.abs(counts[i] - counts[0] / (2 ** i)) <= 3);
-  }
+  assert.ok(counts[0] > counts[1]);
+  assert.ok(counts[2] < counts[1]);
+  assert.ok(Math.abs(counts[0] - counts[1] * 2) <= 3);
+  assert.ok(Math.abs(counts[2] - counts[1] / 2) <= 3);
 });
 
 test('keeps complete context, all hit targets, and exactly one in 5 safe targets', () => {

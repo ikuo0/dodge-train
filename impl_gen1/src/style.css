@@ -13,4 +13,9 @@
 .decision-panel .chosen{background:#183b36;color:#8ce3cf}
 .decision-panel .chosen th{color:#8ce3cf}
 .decision-help{font-size:11px;color:#8294ad;line-height:1.8;margin-bottom:0}
-.score{flex-wrap:wrap;row-gap:8px}
+.score{display:table;width:100%;max-width:220px;table-layout:fixed;border-collapse:collapse;padding-top:8px;font-size:11px;color:#93a5bc}
+.score th,.score td{padding:3px 4px;border-bottom:1px solid #26364c}
+.score th{width:68%;text-align:left;font-weight:400}
+.score td{width:32%;text-align:right}
+.score b{display:inline-block;min-width:4ch;margin:0;color:#edf4ff;font-variant-numeric:tabular-nums}
+@media(max-width:560px){.score{font-size:10px}}

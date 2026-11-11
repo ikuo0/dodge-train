@@ -9,7 +9,7 @@ const PLAYER_WIDTH = 20, FRONT_HALF_WIDTH = PLAYER_WIDTH * 1.5;
 const OUTCOME_SECONDS = 1.5;
 const HISTORY = 128;
 const byId = id => document.getElementById(id);
-let shotIntervalScale = 1;
+let shotIntervalScale = 4;
 class HitRateHistory {
   constructor() {
     this.frames = new Float64Array(60);
@@ -137,7 +137,12 @@ class Arena {
   finishSample() {
     if (!this.decisionHistory) return;
     this.outboxExamples.push({offset: this.outbox.length, history: this.decisionHistory});
-    this.record([this.pendingHits > 0 ? HIT : SAFE]);
+    const isHit = this.pendingHits > 0;
+    this.record([isHit ? HIT : SAFE]);
+    // 特徴収集周期・トリガー: 被弾 or 無被弾が派生したら学習配列追加処理をworkerに通知
+    if (worker) {
+      worker.postMessage({type: 'outcome', isHit, history: this.decisionHistory});
+    }
     this.decisionHistory = null; this.decisionRemaining = 0;
     this.pendingHits = 0;
   }
@@ -169,6 +174,7 @@ const left = new Arena('random', '#edb76b'), right = new Arena('learned', '#67d9
 const SPEEDS = [1, 3, 10];
 let speedIndex = 0;
 let worker, running = false, elapsed = 0, frameId = 0, tickClock = 0, requestId = 0, pending = null, generation = 0;
+let inferClock = 0;
 function initWorker() {
   if (worker) worker.terminate();
   pending = null; const current = ++generation;
@@ -184,7 +190,7 @@ function initWorker() {
     if (current !== generation) return;
     if (data.type === 'tick') {
       if (running) advance(data.dt * SPEEDS[speedIndex]);
-      worker.postMessage({type: 'ticked'});
+      worker.postMessage({type: 'ticked', dt: data.dt});
     } else if (data.type === 'stats') {
       byId('tokens').textContent = data.tokens.toLocaleString(); byId('updates').textContent = data.updates.toLocaleString();
       byId('loss').textContent = data.loss.toFixed(3);
@@ -243,15 +249,21 @@ function advance(dt) {
     left.step(step); right.step(step); dt -= step; elapsed += step;
     left.decisionRemaining -= step; right.decisionRemaining -= step;
     tickClock += step;
+    inferClock += step;
     if (tickClock >= 0.2 - 1e-9) {
       tickClock = 0;
       left.record([TIME_200MS]); right.record([TIME_200MS]);
     }
+    // 決定フェーズ終了時
     if (right.decisionRemaining <= 1e-9) {
       left.finishSample(); right.finishSample();
       flushSamples();
       left.beginSample(true);
-      infer();
+      // 推定周期・トリガー（200ms毎）
+      if (inferClock >= 0.2 - 1e-9) {
+        inferClock = 0;
+        infer();
+      }
       break;
     }
     if (left.outbox.length || right.outbox.length) flushSamples();
@@ -292,7 +304,7 @@ function infer() {
 byId('start').onclick = () => running ? stop() : start();
 byId('bullet-density').onchange = () => {
   const scale = Number(byId('bullet-density').value);
-  if (![1, 2, 4, 8].includes(scale)) return;
+  if (![2, 4, 8].includes(scale)) return;
   for (const arena of [left, right]) {
     arena.shots = arena.shots.map(time => time * scale / shotIntervalScale);
   }
@@ -306,7 +318,7 @@ byId('speed').onclick = () => {
   worker?.postMessage({type: 'speed', value: speed});
 };
 byId('reset').onclick = () => {
-  stop(); left.reset(); right.reset(); elapsed = 0; tickClock = 0; initWorker();
+  stop(); left.reset(); right.reset(); elapsed = 0; tickClock = 0; inferClock = 0; initWorker();
   for (const id of ['tokens', 'updates']) byId(id).textContent = '0';
   for (const id of ['loss', 'risk', 'outcome']) byId(id).textContent = '—';
   clearDecision();

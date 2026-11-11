@@ -23,6 +23,11 @@ const safeSeenBySource = {left: 0, right: 0};
 let total = 0, nextTrain = 1, updates = 0, loss = 0, active = false, timer = null, lastStats = 0;
 let clockTimer = null, lastTick = 0, tickPending = false;
 let speed = 1;
+// 学習トリガー（1000ms）と推定トリガー（200ms）の管理
+let learnClock = 0, inferClock = 0;
+// 被弾・無被弾の状況配列（バランス管理用）
+const hitExamples = [], safeExamples = [];
+const LEARN_INTERVAL = 1.0, INFER_INTERVAL = 0.2;
 function tick() {
   const now = performance.now();
   // Bound elapsed time and allow only one outstanding tick after a stalled tab.
@@ -153,6 +158,18 @@ onmessage = ({data}) => {
     if ([1, 3, 10].includes(data.value)) speed = data.value;
   } else if (data.type === 'ticked') {
     tickPending = false;
+    // 学習周期・トリガー（1000ms毎）
+    if (data.dt !== undefined) {
+      learnClock += data.dt * 1000;
+      if (learnClock >= LEARN_INTERVAL * 1000) {
+        if (hitExamples.length > 0 && safeExamples.length > 0) {
+          // 被弾・無被弾が両方揃っている場合のみ学習
+          const learningCount = Math.min(hitExamples.length, safeExamples.length);
+          replayRemaining = Math.min(CAPACITY, replayRemaining + learningCount * speed);
+        }
+        learnClock = 0;
+      }
+    }
   } else if (data.type === 'tokens') {
     const source = data.source === 'left' || data.source === 'right' ? data.source : null;
     const examples = new Map((data.examples || []).map(example => [example.offset, example.history]));
@@ -173,6 +190,17 @@ onmessage = ({data}) => {
     }
     if (data.tokens.length) replayRemaining = Math.min(CAPACITY, replayRemaining + 4 * speed);
     schedule();
+  } else if (data.type === 'outcome') {
+    // 特徴収集周期・トリガー: 被弾 or 無被弾が派生したら学習配列追加処理
+    if (data.isHit) {
+      hitExamples.push(data);
+    } else {
+      safeExamples.push(data);
+    }
+    // 無被弾状況配列が被弾状況配列を超えないようにする
+    if (safeExamples.length > hitExamples.length) {
+      safeExamples.shift();
+    }
   } else if (data.type === 'infer') {
     postMessage({type: 'choice', id: data.id, ...choose(data.history, data.observation, data.actions)});
   } else if (data.type === 'pause') {
