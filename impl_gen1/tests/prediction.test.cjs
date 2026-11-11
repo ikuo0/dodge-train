@@ -8,7 +8,7 @@ function load(name, extra = {}) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../src', name), 'utf8'), context);
   return context;
 }
-function game() {
+function game(extra = {}) {
   const elements = new Map();
   const messages = [];
   const canvas = new Proxy({}, {get: () => () => {}});
@@ -16,8 +16,59 @@ function game() {
     if (!elements.has(id)) elements.set(id, {textContent: '', getContext: () => canvas, setAttribute() {}});
     return elements.get(id);
   }};
-  return {context: load('game.js', {document, Worker: class {postMessage(m) {messages.push(m);} terminate() {}}, requestAnimationFrame: () => 1, cancelAnimationFrame() {}}), elements, messages};
+  return {context: load('game.js', {document, Worker: class {postMessage(m) {messages.push(m);} terminate() {}}, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, ...extra}), elements, messages};
 }
+test('all token IDs and words round-trip without collisions', () => {
+  const {context} = game();
+  assert.equal(vm.runInContext(`
+    TOKEN_WORDS.length === 41 && WORD_TOKENS.size === 41 &&
+      TOKEN_WORDS.every((word, id) => tokenToWord(id) === word && wordToToken(word) === id)
+  `, context), true);
+  assert.throws(() => vm.runInContext('tokenToWord(41)', context), /Unknown token ID/);
+  assert.throws(() => vm.runInContext("wordToToken('不明')", context), /Unknown token word/);
+});
+test('sentence viewer records ten latest 64-token decisions and refreshes every ten seconds', () => {
+  const intervals = [];
+  const {context, elements} = game({setInterval: (callback, ms) => intervals.push({callback, ms})});
+  const viewer = intervals.find(interval => interval.ms === 10000);
+  assert.ok(viewer);
+  vm.runInContext(`
+    for (let i = 0; i < 12; i++) recordActionSentence([...Array(70).fill(36), i % 7]);
+  `, context);
+  assert.equal(elements.get('sentence-0').textContent, '—');
+  viewer.callback();
+  assert.equal(vm.runInContext('actionSentences.length', context), 10);
+  assert.equal(elements.get('sentence-0').textContent.split(', ').length, 64);
+  assert.equal(elements.get('sentence-0').textContent.split(', ').at(-1), '待機 300ms');
+  assert.equal(elements.get('sentence-9').textContent.split(', ').at(-1), '右 ¼');
+  vm.runInContext("actionSentences.length = 0; updateSentenceViewer()", context);
+  assert.equal(elements.get('sentence-0').textContent, '—');
+  assert.equal(elements.get('sentence-0').disabled, true);
+});
+test('right-side choices populate the viewer and reset clears it', () => {
+  const {context, elements} = game();
+  vm.runInContext(`
+    start();
+    worker.onmessage({data: {type:'choice', id:pending, action:2, risk:0.1, outcome:SAFE}});
+    updateSentenceViewer();
+  `, context);
+  assert.equal(elements.get('sentence-0').textContent, '自機位置5, 弾なし, 右 ¼');
+  elements.get('reset').onclick();
+  assert.equal(elements.get('sentence-0').textContent, '—');
+  assert.equal(elements.get('sentence-0').disabled, true);
+});
+test('sentence viewer copies the displayed full line and reports clipboard errors', async () => {
+  const copied = [];
+  const {context, elements} = game({navigator: {clipboard: {writeText: async text => copied.push(text)}}});
+  vm.runInContext("recordActionSentence(Array(64).fill(36)); updateSentenceViewer()", context);
+  const sentence = elements.get('sentence-0').textContent;
+  await elements.get('sentence-0').onclick();
+  assert.equal(copied[0], sentence);
+  assert.equal(elements.get('sentence-status').textContent, '文章をコピーしました。');
+  context.navigator.clipboard.writeText = async () => { throw new Error('denied'); };
+  await elements.get('sentence-0').onclick();
+  assert.match(elements.get('sentence-status').textContent, /コピーに失敗/);
+});
 test('records an earlier observation and action followed by exactly one outcome', () => {
   const {context} = game();
   const result = vm.runInContext(`

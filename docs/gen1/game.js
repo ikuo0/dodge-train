@@ -3,6 +3,23 @@
 const ACTIONS = ['左 ¼', '左 ½', '右 ¼', '右 ½', '待機 300ms', '待機 600ms', '待機 900ms'];
 const POSITION = 7, BULLET = 15, HIT = 33, SAFE = 34, NO_BULLETS = 35;
 const TIME_200MS = 36, MOVE_END = 37, BULLET_EXIT = 38, CONTACT = 39, WAIT_END = 40;
+const TOKEN_WORDS = [
+  ...ACTIONS,
+  ...Array.from({length: 8}, (_, i) => `自機位置${i + 1}`),
+  ...['安全', '危険'].flatMap(threat =>
+    ['左', '正面', '右'].flatMap(direction =>
+      ['低速', '中速', '高速'].map(speed => `弾_${threat}_${direction}_${speed}`))),
+  '被弾', '無被弾', '弾なし', '200ms経過', '移動完了', '弾退出', '被弾発生', '待機完了'
+];
+const WORD_TOKENS = new Map(TOKEN_WORDS.map((word, id) => [word, id]));
+function tokenToWord(id) {
+  if (!Number.isInteger(id) || id < 0 || id >= TOKEN_WORDS.length) throw new RangeError(`Unknown token ID: ${id}`);
+  return TOKEN_WORDS[id];
+}
+function wordToToken(word) {
+  if (!WORD_TOKENS.has(word)) throw new RangeError(`Unknown token word: ${word}`);
+  return WORD_TOKENS.get(word);
+}
 const W = 360, H = 560, PLAYER_Y = 513, RADIUS = 9;
 const OBSERVATION_Y = H / 3;
 const PLAYER_WIDTH = 20, FRONT_HALF_WIDTH = PLAYER_WIDTH * 1.5;
@@ -175,6 +192,31 @@ const SPEEDS = [1, 3, 10];
 let speedIndex = 0;
 let worker, running = false, elapsed = 0, frameId = 0, tickClock = 0, requestId = 0, pending = null, generation = 0;
 let inferClock = 0;
+const actionSentences = [];
+function recordActionSentence(history) {
+  actionSentences.unshift(history.slice(-64).map(tokenToWord).join(', '));
+  if (actionSentences.length > 10) actionSentences.pop();
+}
+function updateSentenceViewer() {
+  for (let i = 0; i < 10; i++) {
+    const row = byId('sentence-' + i);
+    row.textContent = actionSentences[i] || '—';
+    row.disabled = !actionSentences[i];
+    row.title = actionSentences[i] || '';
+  }
+}
+async function copySentence(index) {
+  const sentence = byId('sentence-' + index).textContent;
+  const status = byId('sentence-status');
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error('Clipboard API unavailable');
+    await navigator.clipboard.writeText(sentence);
+    status.textContent = '文章をコピーしました。';
+  } catch (error) {
+    console.error('文章のコピーに失敗しました。', error);
+    status.textContent = 'コピーに失敗しました。HTTPSまたはlocalhostで開き、クリップボードの権限を確認してください。';
+  }
+}
 function initWorker() {
   if (worker) worker.terminate();
   pending = null; const current = ++generation;
@@ -198,6 +240,7 @@ function initWorker() {
       pending = null;
       if (running) {
         right.beginSample(false, data.action);
+        recordActionSentence(right.decisionHistory);
         byId('risk').textContent = (data.risk * 100).toFixed(1) + '%';
         byId('outcome').textContent = data.outcome === HIT ? '被弾' : '無被弾';
         updateDecision(data);
@@ -319,10 +362,14 @@ byId('speed').onclick = () => {
 };
 byId('reset').onclick = () => {
   stop(); left.reset(); right.reset(); elapsed = 0; tickClock = 0; inferClock = 0; initWorker();
+  actionSentences.length = 0; updateSentenceViewer(); byId('sentence-status').textContent = '';
   for (const id of ['tokens', 'updates']) byId(id).textContent = '0';
   for (const id of ['loss', 'risk', 'outcome']) byId(id).textContent = '—';
   clearDecision();
   if (worker) { byId('error').textContent = ''; byId('status').textContent = '待機中'; }
   updateDisplay(); left.draw(); right.draw(); start();
 };
+for (let i = 0; i < 10; i++) byId('sentence-' + i).onclick = () => copySentence(i);
+updateSentenceViewer();
+setInterval(updateSentenceViewer, 10000);
 initWorker(); left.draw(); right.draw();

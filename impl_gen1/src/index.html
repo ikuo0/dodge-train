@@ -11,8 +11,8 @@
 <main>
 <header><div><span class="eyebrow">NEURAL DODGE EXPERIMENT</span><h1>避ける、を学習する。</h1></div><span id="status" role="status">待機中</span></header>
 <div class="arenas">
-<section><div class="label"><h2><i class="dot random"></i>01 / RANDOM</h2><span>行動データを収集</span></div><canvas id="random" width="360" height="560" aria-label="ランダム操作のゲーム画面"></canvas><table class="score"><tbody><tr><th scope="row">被弾</th><td><b id="left-hits">0</b></td></tr><tr><th scope="row">被弾/分（1分）</th><td><b id="left-rate">—</b></td></tr><tr><th scope="row">被弾/分（10分）</th><td><b id="left-rate-long">—</b></td></tr><tr><th scope="row">行動</th><td><b id="left-action">待機</b></td></tr></tbody></table></section>
-<section><div class="label"><h2><i class="dot learned"></i>02 / LEARNED</h2><span>NNで行動を選択・経験を学習</span></div><canvas id="learned" width="360" height="560" aria-label="学習モデル操作のゲーム画面"></canvas><table class="score"><tbody><tr><th scope="row">被弾</th><td><b id="right-hits">0</b></td></tr><tr><th scope="row">被弾/分（1分）</th><td><b id="right-rate">—</b></td></tr><tr><th scope="row">被弾/分（10分）</th><td><b id="right-rate-long">—</b></td></tr><tr><th scope="row">行動</th><td><b id="right-action">待機</b></td></tr></tbody></table></section>
+<section><div class="label"><h2><i class="dot random"></i>01 / 経験データの収集</h2><span>行動データを収集</span></div><canvas id="random" width="360" height="560" aria-label="ランダム操作のゲーム画面"></canvas><table class="score"><tbody><tr><th scope="row">被弾</th><td><b id="left-hits">0</b></td></tr><tr><th scope="row">被弾/分（1分）</th><td><b id="left-rate">—</b></td></tr><tr><th scope="row">被弾/分（10分）</th><td><b id="left-rate-long">—</b></td></tr><tr><th scope="row">行動</th><td><b id="left-action">待機</b></td></tr></tbody></table></section>
+<section><div class="label"><h2><i class="dot learned"></i>02 / 学習モデルの操作</h2><span>NNで行動を選択・経験を学習</span></div><canvas id="learned" width="360" height="560" aria-label="学習モデル操作のゲーム画面"></canvas><table class="score"><tbody><tr><th scope="row">被弾</th><td><b id="right-hits">0</b></td></tr><tr><th scope="row">被弾/分（1分）</th><td><b id="right-rate">—</b></td></tr><tr><th scope="row">被弾/分（10分）</th><td><b id="right-rate-long">—</b></td></tr><tr><th scope="row">行動</th><td><b id="right-action">待機</b></td></tr></tbody></table></section>
 </div>
 <div class="controls"><button id="start">START</button><button id="reset" class="secondary">学習リセット</button><button id="speed" class="secondary" aria-label="学習速度を切り替え：現在1倍">速度 ×1</button><span id="elapsed">00:00</span></div>
 <div class="density-controls"><label for="bullet-density">弾数</label><select id="bullet-density"><option value="2">2倍（従来量の約1/2）</option><option value="4" selected>基準（従来量の約1/4）</option><option value="8">1/2倍（従来量の約1/8）</option></select></div>
@@ -30,6 +30,23 @@
 <tr id="decision-row-6"><th scope="row">待機 900ms</th><td id="decision-score-6">—</td><td id="decision-result-6">未評価</td><td id="decision-picked-6"></td></tr>
 </tbody></table>
 <p class="decision-help">候補のどれかで被弾が無被弾より高確率になった時だけ更新し、安全予測の間は表示を保持します。スコアは学習モデルの比較値です。</p>
+</section>
+<section class="sentence-panel" aria-labelledby="sentence-title">
+<h2 id="sentence-title">文章ビューワ / 学習モデルの行動履歴</h2>
+<p>行動選択時の直近64トークンを最新10件表示します（10秒ごとに更新）。行をクリックすると全文をコピーします。</p>
+<div class="sentence-list">
+<button type="button" id="sentence-0" disabled>—</button>
+<button type="button" id="sentence-1" disabled>—</button>
+<button type="button" id="sentence-2" disabled>—</button>
+<button type="button" id="sentence-3" disabled>—</button>
+<button type="button" id="sentence-4" disabled>—</button>
+<button type="button" id="sentence-5" disabled>—</button>
+<button type="button" id="sentence-6" disabled>—</button>
+<button type="button" id="sentence-7" disabled>—</button>
+<button type="button" id="sentence-8" disabled>—</button>
+<button type="button" id="sentence-9" disabled>—</button>
+</div>
+<p id="sentence-status" role="status" aria-live="polite"></p>
 </section>
 <p class="note">左右の行動と実際の結果からオンライン学習。右は「弾状況 → 移動候補」から1500ms以内の被弾・無被弾を予測し、行動は1500ms固定します。記録はイベント発生時＋200ms経過トークン。学習はメモリ内のみ・再読み込みで初期化。</p>
 <p id="error" role="alert"></p>
