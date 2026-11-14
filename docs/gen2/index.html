@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DODGE gen2 / 遅延観測による学習</title>
+<link rel="stylesheet" href="style.css">
+<script src="words.js" defer></script>
+<script src="game.js" defer></script>
+</head>
+<body>
+<main>
+<header><div><span class="eyebrow">NEURAL DODGE EXPERIMENT</span><h1>避ける、を学習する。</h1></div><span id="status" role="status">待機中</span></header>
+<div class="arenas">
+<section><div class="label"><h2><i class="dot random"></i>01 / 経験データの収集</h2><span>行動データを収集</span></div><canvas id="random" width="360" height="560" aria-label="ランダム操作のゲーム画面"></canvas><table class="score"><tbody><tr><th scope="row">被弾</th><td><b id="left-hits">0</b></td></tr><tr><th scope="row">被弾/分（1分）</th><td><b id="left-rate">—</b></td></tr><tr><th scope="row">被弾/分（10分）</th><td><b id="left-rate-long">—</b></td></tr><tr><th scope="row">行動</th><td><b id="left-action">待機</b></td></tr></tbody></table></section>
+<section><div class="label"><h2><i class="dot learned"></i>02 / 学習モデルの操作</h2><span>NNで行動を選択・経験も学習</span></div><canvas id="learned" width="360" height="560" aria-label="学習モデル操作のゲーム画面"></canvas><table class="score"><tbody><tr><th scope="row">被弾</th><td><b id="right-hits">0</b></td></tr><tr><th scope="row">被弾/分（1分）</th><td><b id="right-rate">—</b></td></tr><tr><th scope="row">被弾/分（10分）</th><td><b id="right-rate-long">—</b></td></tr><tr><th scope="row">行動</th><td><b id="right-action">待機</b></td></tr></tbody></table></section>
+</div>
+<div class="controls"><button id="start">START</button><button id="reset" class="secondary">学習リセット</button><button id="speed" class="secondary" aria-label="学習速度を切り替え：現在1倍">速度 ×1</button><span id="elapsed">00:00</span></div>
+<div class="density-controls"><label for="bullet-density">弾数</label><select id="bullet-density"><option value="2">倍</option><option value="4" selected>標準</option><option value="8">半分</option></select></div>
+
+<div class="metrics" aria-live="off"><span>学習トークン <b id="tokens">0</b></span><span>更新回数 <b id="updates">0</b></span><span>学習待ち <b id="queued">0</b></span><span>平均損失 <b id="loss">—</b></span><span>予測結果 <b id="outcome">—</b></span><span>ぼかした危険スコア <b id="risk">—</b></span></div>
+<section class="decision-panel" aria-labelledby="decision-title">
+<h2 id="decision-title">判断状況 / 最後に危険を検出した判断</h2>
+<p id="decision-summary">危険な候補を検出すると更新します。</p>
+<table><thead><tr><th scope="col">行動候補</th><th scope="col">被弾スコア</th><th scope="col">予測</th><th scope="col">選択</th></tr></thead><tbody>
+<tr id="decision-row-0"><th scope="row">左 250ms</th><td id="decision-score-0">—</td><td id="decision-result-0">未評価</td><td id="decision-picked-0"></td></tr>
+<tr id="decision-row-1"><th scope="row">右 250ms</th><td id="decision-score-1">—</td><td id="decision-result-1">未評価</td><td id="decision-picked-1"></td></tr>
+<tr id="decision-row-2"><th scope="row">待機 250ms</th><td id="decision-score-2">—</td><td id="decision-result-2">未評価</td><td id="decision-picked-2"></td></tr>
+</tbody></table>
+<p class="decision-help">300ms以上前の粗い観測を使い、250msごとにNNで左・右・待機を選びます。危険スコアは太らせた自機と粗い到達情報を教師にした推定値です。</p>
+</section>
+<section class="sentence-panel" aria-labelledby="sentence-title">
+<h2 id="sentence-title">文章ビューワ / 学習モデルの行動履歴</h2>
+<p>行動選択時の直近64トークンを最新10件表示します（10秒ごとに更新）。行をクリックすると全文をコピーします。</p>
+<div class="sentence-list">
+<button type="button" id="sentence-0" disabled>—</button>
+<button type="button" id="sentence-1" disabled>—</button>
+<button type="button" id="sentence-2" disabled>—</button>
+<button type="button" id="sentence-3" disabled>—</button>
+<button type="button" id="sentence-4" disabled>—</button>
+<button type="button" id="sentence-5" disabled>—</button>
+<button type="button" id="sentence-6" disabled>—</button>
+<button type="button" id="sentence-7" disabled>—</button>
+<button type="button" id="sentence-8" disabled>—</button>
+<button type="button" id="sentence-9" disabled>—</button>
+</div>
+<p id="sentence-status" role="status" aria-live="polite"></p>
+</section>
+<p class="note">gen2：状況単語IDの逆数重み付きONE-HOT総和 → 48ユニットNN → 3行動の危険度。弾の観測は300ms遅延し50ms刻み、行動選択は250ms刻みです。正確な衝突結果は学習に使用しません。初回は粗い基礎教材で24000回学習し、以降も経験と基礎教材を混ぜます。再読み込みで初期化します。</p>
+<p id="error" role="alert"></p>
+</main>
+</body>
+</html>
